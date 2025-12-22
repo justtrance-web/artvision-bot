@@ -1,0 +1,16 @@
+# Artvision Task Manager Bot — Dependencies
+
+# Telegram
+python-telegram-bot[job-queue]==20.7
+
+# OpenAI (Whisper)
+openai>=1.0.0
+
+# HTTP requests
+requests>=2.31.0
+
+# Scheduler
+APScheduler>=3.10.0
+
+# Environment
+python-dotenv>=1.0.0
