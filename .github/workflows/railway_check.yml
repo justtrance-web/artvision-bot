@@ -1,0 +1,64 @@
+name: Railway Auto-Deploy Check
+
+on:
+  schedule:
+    - cron: '*/30 * * * *'  # Каждые 30 минут
+  workflow_dispatch:  # Ручной запуск
+
+jobs:
+  check-and-deploy:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Check Railway and Deploy
+        env:
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_ADMIN_ID: ${{ secrets.TELEGRAM_ADMIN_ID }}
+        run: |
+          PROJECT_ID="22feb938-3d8e-4ef2-8014-60d770e9020f"
+          ENV_ID="884b4b73-6051-48a4-a14c-bbfb760d878f"
+          SERVICE_ID="2da0c1a7-a6be-41a1-a03d-fc1387b28dcf"
+          
+          echo "=== Checking Railway status ==="
+          
+          RESULT=$(curl -s -X POST https://backboard.railway.app/graphql/v2 \
+            -H "Authorization: Bearer $RAILWAY_TOKEN" \
+            -H "Content-Type: application/json" \
+            -d "{
+              \"query\": \"mutation { variableCollectionUpsert(input: { projectId: \\\"$PROJECT_ID\\\", environmentId: \\\"$ENV_ID\\\", serviceId: \\\"$SERVICE_ID\\\", variables: { TELEGRAM_BOT_TOKEN: \\\"$TELEGRAM_BOT_TOKEN\\\", ASANA_TOKEN: \\\"${{ secrets.ASANA_TOKEN }}\\\", ADMIN_IDS: \\\"$TELEGRAM_ADMIN_ID\\\", ASANA_WORKSPACE: \\\"860693669973770\\\", ASANA_PROJECT: \\\"1212305892582815\\\" } }) }\"
+            }")
+          
+          echo "Response: $RESULT"
+          
+          if echo "$RESULT" | grep -q "limited plan"; then
+            echo "❌ Still blocked - waiting for verification"
+            exit 0
+          elif echo "$RESULT" | grep -q "error"; then
+            echo "⚠️ Error occurred"
+            exit 1
+          else
+            echo "✅ SUCCESS! Variables set!"
+            
+            # Отправляем уведомление в Telegram
+            curl -s -X POST "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" \
+              -d "chat_id=${TELEGRAM_ADMIN_ID}" \
+              -d "text=🚀 Railway разблокирован! Бот деплоится..." \
+              -d "parse_mode=HTML"
+            
+            # Триггерим деплой
+            DEPLOY_RESULT=$(curl -s -X POST https://backboard.railway.app/graphql/v2 \
+              -H "Authorization: Bearer $RAILWAY_TOKEN" \
+              -H "Content-Type: application/json" \
+              -d "{
+                \"query\": \"mutation { serviceInstanceDeploy(serviceId: \\\"$SERVICE_ID\\\", environmentId: \\\"$ENV_ID\\\") { id } }\"
+              }")
+            
+            echo "Deploy triggered: $DEPLOY_RESULT"
+            
+            # Уведомление об успехе
+            curl -s -X POST "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" \
+              -d "chat_id=${TELEGRAM_ADMIN_ID}" \
+              -d "text=✅ Деплой запущен! Бот скоро заработает." \
+              -d "parse_mode=HTML"
+          fi
