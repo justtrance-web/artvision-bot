@@ -303,7 +303,7 @@ def handle_positions(chat_id, args):
     send_tg(chat_id, "\n".join(msg))
 
 
-def handle_slash_command(chat_id, user_id, text):
+def handle_slash_command(chat_id, user_id, text, msg=None):
     """Обработка стандартных /команд"""
     if str(user_id) not in ADMIN_IDS:
         send_tg(chat_id, "⛔ Нет доступа")
@@ -315,6 +315,14 @@ def handle_slash_command(chat_id, user_id, text):
     
     if cmd == "/ping":
         send_tg(chat_id, "🏓 pong!")
+    
+    elif cmd == "/myid":
+        # Команда для всех — узнать свой Telegram ID
+        user_name = msg.get("from", {}).get("first_name", "User")
+        send_tg(chat_id, f"👤 {user_name}, твой Telegram ID: <code>{user_id}</code>
+
+Скопируй и отправь Кириллу для настройки бота.")
+        return
     
     elif cmd in ["/start", "/help"]:
         send_tg(chat_id, """<b>🤖 Artvision Bot v5</b>
@@ -403,7 +411,7 @@ class handler(BaseHTTPRequestHandler):
                 
                 # 1. Слэш-команды
                 elif text.startswith("/"):
-                    handle_slash_command(chat_id, user_id, text)
+                    handle_slash_command(chat_id, user_id, text, msg)
                 
                 # 2. Прямое обращение к боту ("Бот, ...", @mention, reply)
                 elif is_bot_trigger(text, msg):
@@ -429,3 +437,5 @@ class handler(BaseHTTPRequestHandler):
         self.send_response(200)
         self.end_headers()
         self.wfile.write(b"Artvision Bot v5 - Smart Mode")
+
+
